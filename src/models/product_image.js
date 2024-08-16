@@ -1,4 +1,4 @@
-const { Model, Datatypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
   class ProductImage extends Model {
@@ -14,12 +14,12 @@ module.exports = (sequelize) => {
   ProductImage.init(
     {
       id: {
-        type: Datatypes.INTEGER,
+        type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
       },
       product_id: {
-        type: Datatypes.INTEGER,
+        type: DataTypes.INTEGER,
         allowNull: false,
         references: {
           model: 'products',
@@ -27,11 +27,11 @@ module.exports = (sequelize) => {
         },
       },
       enabled: {
-        type: Datatypes.BOOLEAN,
+        type: DataTypes.BOOLEAN,
         defaultValue: false,
       },
       path: {
-        type: Datatypes.STRING,
+        type: DataTypes.STRING,
         allowNull: false,
       },
     },
@@ -41,5 +41,7 @@ module.exports = (sequelize) => {
       tableName: 'product_images',
       timestamps: true,
     }
-  )
+  );
+
+  return ProductImage;
 }

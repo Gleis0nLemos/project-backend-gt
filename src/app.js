@@ -8,6 +8,6 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-app.use('/api', routes);
+app.use(routes);
 
 module.exports = app;
