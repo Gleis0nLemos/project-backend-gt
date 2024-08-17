@@ -70,7 +70,32 @@ const getCategoryById = async (req, res) => {
   }
 }
 
+const createCategory = async (req, res) => {
+  try {
+    const { name, slug, use_in_menu } = req.body;
+
+    // check if all fields are filled in
+    if (!name || !slug) {
+      return res.status(400).json({ message: 'Name and slug are required' });
+    }
+
+    // create a new Category
+    const newCategory = await Category.create({
+      name, 
+      slug,
+      use_in_menu: use_in_menu || false, // default value is false if not provided
+    });
+
+    // return category created if status 201
+    res.status(201).json(newCategory);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });  
+  }
+}
+
 module.exports = {
   searchCategories,
   getCategoryById,
+  createCategory,
 };
