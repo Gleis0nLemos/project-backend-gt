@@ -1,13 +1,12 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const routes = require('./routes'); // import routes
+const app = express();
 
 dotenv.config();
 
-const app = express();
-
 // Middleware
 app.use(express.json());
-app.use('/api', routes);
+app.use(routes);
 
 module.exports = app;
