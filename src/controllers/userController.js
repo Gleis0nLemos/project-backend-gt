@@ -139,9 +139,32 @@ const updateUser = async (req, res) => {
   }
 }
 
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // verify if user exists
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // delete user
+    await User.destroy({ 
+      where: { id } 
+    });
+
+    res.status(204).send(); // no content
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 module.exports = {
   getUserById,
   createUser,
   authenticateUser,
   updateUser,
+  deleteUser,
 };
