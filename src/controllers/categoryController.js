@@ -128,9 +128,33 @@ const updateCategory = async (req, res) => {
   }
 }
 
+const deleteCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // find category by id
+    const category = await Category.findByPk(id);
+
+    // check if category exists
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    // delete category
+    await category.destroy();
+
+    // return 204 no content
+    res.status(204).send();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 module.exports = {
   searchCategories,
   getCategoryById,
   createCategory,
   updateCategory,
+  deleteCategory,
 };
