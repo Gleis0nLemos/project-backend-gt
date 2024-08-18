@@ -94,8 +94,43 @@ const createCategory = async (req, res) => {
   }
 }
 
+const updateCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, slug, use_in_menu } = req.body;
+
+    // check if required fields are present
+    if (!name || !slug) {
+      return res.status(400).json({ message: 'Name and slug are required' });
+    }
+
+    // find category by id
+    const category = await Category.findByPk(id);
+
+    // check if category exists
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    // update category fields
+    category.name = name;
+    category.slug = slug;
+    category.use_in_menu = use_in_menu;
+
+    // save changes
+    await category.save();
+
+    // return 204 no content
+    res.status(204).send();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 module.exports = {
   searchCategories,
   getCategoryById,
   createCategory,
+  updateCategory,
 };
