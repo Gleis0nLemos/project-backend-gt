@@ -47,7 +47,7 @@ module.exports = (sequelize) => {
         defaultValue: 'square',
       },
       radius: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.STRING,
         defaultValue: 0,
       },
       type: {

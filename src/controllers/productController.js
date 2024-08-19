@@ -133,7 +133,63 @@ const getProductById = async (req, res) => {
   }
 };
 
+const createProduct = async (req, res) => {
+  try {
+    // Validar o corpo da solicitação
+    const { enabled, name, slug, stock, description, price, price_with_discount, category_ids, images, options } = req.body;
+
+    if (!name || !slug || !price || !price_with_discount) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // Criar o produto
+    const product = await Product.create({
+      enabled,
+      name,
+      slug,
+      stock,
+      description,
+      price,
+      price_with_discount,
+    });
+
+    // Associar categorias
+    if (category_ids && Array.isArray(category_ids)) {
+      await product.setCategories(category_ids);
+    }
+
+    // Adicionar imagens
+    if (images && Array.isArray(images)) {
+      const imagePromises = images.map(image => ProductImage.create({
+        type: image.type,
+        path: image.content, // Assume que o conteúdo é base64
+        product_id: product.id
+      }));
+      await Promise.all(imagePromises);
+    }
+
+    // Adicionar opções
+    if (options && Array.isArray(options)) {
+      const optionPromises = options.map(option => ProductOption.create({
+        title: option.title,
+        shape: option.shape,
+        radius: option.radius,
+        type: option.type,
+        values: option.values.join(','),
+        product_id: product.id
+      }));
+      await Promise.all(optionPromises);
+    }
+
+    return res.status(201).json({ message: 'Product created successfully', product });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   getProducts,
   getProductById,
+  createProduct,
 }
