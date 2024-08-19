@@ -188,8 +188,132 @@ const createProduct = async (req, res) => {
   }
 };
 
+
+// Função para atualizar um produto existente
+const updateProduct = async (req, res) => {
+  try {
+    const productId = req.params.id;
+    const { enabled, name, slug, stock, description, price, price_with_discount, category_ids, images, options } = req.body;
+
+    // Verificar se o produto existe
+    const product = await Product.findByPk(productId);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    // Atualizar o produto
+    await product.update({
+      enabled,
+      name,
+      slug,
+      stock,
+      description,
+      price,
+      price_with_discount,
+    });
+
+    // Atualizar categorias
+    if (category_ids && Array.isArray(category_ids)) {
+      await product.setCategories(category_ids);
+    }
+
+    // Atualizar imagens
+    if (images && Array.isArray(images)) {
+      const existingImages = await ProductImage.findAll({ where: { product_id: productId } });
+      const existingImageIds = existingImages.map(img => img.id);
+
+      // Marcar imagens existentes para exclusão
+      const imagesToDelete = existingImageIds.filter(id => !images.find(img => img.id === id));
+      if (imagesToDelete.length > 0) {
+        await ProductImage.destroy({ where: { id: imagesToDelete } });
+      }
+
+      // Atualizar ou adicionar novas imagens
+      const imagePromises = images.map(async (image) => {
+        if (image.deleted) {
+          return ProductImage.destroy({ where: { id: image.id } });
+        } else if (image.id) {
+          return ProductImage.update(
+            { type: image.type, path: image.content },
+            { where: { id: image.id } }
+          );
+        } else {
+          return ProductImage.create({
+            type: image.type,
+            path: image.content,
+            product_id: productId
+          });
+        }
+      });
+      await Promise.all(imagePromises);
+    }
+
+    // Atualizar opções
+    if (options && Array.isArray(options)) {
+      const existingOptions = await ProductOption.findAll({ where: { product_id: productId } });
+      const existingOptionIds = existingOptions.map(opt => opt.id);
+
+      // Marcar opções existentes para exclusão
+      const optionsToDelete = existingOptionIds.filter(id => !options.find(opt => opt.id === id));
+      if (optionsToDelete.length > 0) {
+        await ProductOption.destroy({ where: { id: optionsToDelete } });
+      }
+
+      // Atualizar ou adicionar novas opções
+      const optionPromises = options.map(async (option) => {
+        if (option.deleted) {
+          return ProductOption.destroy({ where: { id: option.id } });
+        } else if (option.id) {
+          return ProductOption.update(
+            { title: option.title, shape: option.shape, radius: option.radius, type: option.type, values: option.values.join(',') },
+            { where: { id: option.id } }
+          );
+        } else {
+          return ProductOption.create({
+            title: option.title,
+            shape: option.shape,
+            radius: option.radius,
+            type: option.type,
+            values: option.values.join(','),
+            product_id: productId
+          });
+        }
+      });
+      await Promise.all(optionPromises);
+    }
+
+    return res.status(204).send(); // 204 No Content
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+// Função para deletar um produto
+const deleteProduct = async (req, res) => {
+  try {
+    const productId = req.params.id;
+
+    // Verificar se o produto existe
+    const product = await Product.findByPk(productId);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    // Remover o produto
+    await product.destroy();
+
+    return res.status(204).send(); // 204 No Content
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   getProducts,
   getProductById,
   createProduct,
+  updateProduct,
+  deleteProduct,
 }
