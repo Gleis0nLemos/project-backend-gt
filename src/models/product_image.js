@@ -6,7 +6,7 @@ module.exports = (sequelize) => {
       // association with product model
       ProductImage.belongsTo(models.Product, {
         foreignKey: 'product_id',
-        as: 'product',
+        //as: 'product',
       });
     }
   }
