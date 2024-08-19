@@ -135,14 +135,14 @@ const getProductById = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    // Validar o corpo da solicitação
+    // validate the request body
     const { enabled, name, slug, stock, description, price, price_with_discount, category_ids, images, options } = req.body;
 
     if (!name || !slug || !price || !price_with_discount) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    // Criar o produto
+    // create product
     const product = await Product.create({
       enabled,
       name,
@@ -153,16 +153,16 @@ const createProduct = async (req, res) => {
       price_with_discount,
     });
 
-    // Associar categorias
+    // associate categories
     if (category_ids && Array.isArray(category_ids)) {
       await product.setCategories(category_ids);
     }
 
-    // Adicionar imagens
+    // add images
     if (images && Array.isArray(images)) {
       const imagePromises = images.map(image => ProductImage.create({
         type: image.type,
-        path: image.content, // Assume que o conteúdo é base64
+        path: image.content, // assumes content is base64
         product_id: product.id
       }));
       await Promise.all(imagePromises);
@@ -188,20 +188,18 @@ const createProduct = async (req, res) => {
   }
 };
 
-
-// Função para atualizar um produto existente
 const updateProduct = async (req, res) => {
   try {
     const productId = req.params.id;
     const { enabled, name, slug, stock, description, price, price_with_discount, category_ids, images, options } = req.body;
 
-    // Verificar se o produto existe
+    // check if product exists
     const product = await Product.findByPk(productId);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Atualizar o produto
+    // update product
     await product.update({
       enabled,
       name,
@@ -212,23 +210,23 @@ const updateProduct = async (req, res) => {
       price_with_discount,
     });
 
-    // Atualizar categorias
+    // update categories
     if (category_ids && Array.isArray(category_ids)) {
       await product.setCategories(category_ids);
     }
 
-    // Atualizar imagens
+    // update images
     if (images && Array.isArray(images)) {
       const existingImages = await ProductImage.findAll({ where: { product_id: productId } });
       const existingImageIds = existingImages.map(img => img.id);
 
-      // Marcar imagens existentes para exclusão
+      // mark existing images for deletion
       const imagesToDelete = existingImageIds.filter(id => !images.find(img => img.id === id));
       if (imagesToDelete.length > 0) {
         await ProductImage.destroy({ where: { id: imagesToDelete } });
       }
 
-      // Atualizar ou adicionar novas imagens
+      // update or add new images
       const imagePromises = images.map(async (image) => {
         if (image.deleted) {
           return ProductImage.destroy({ where: { id: image.id } });
@@ -248,18 +246,18 @@ const updateProduct = async (req, res) => {
       await Promise.all(imagePromises);
     }
 
-    // Atualizar opções
+    // update options
     if (options && Array.isArray(options)) {
       const existingOptions = await ProductOption.findAll({ where: { product_id: productId } });
       const existingOptionIds = existingOptions.map(opt => opt.id);
 
-      // Marcar opções existentes para exclusão
+      // mark existing options for deletion
       const optionsToDelete = existingOptionIds.filter(id => !options.find(opt => opt.id === id));
       if (optionsToDelete.length > 0) {
         await ProductOption.destroy({ where: { id: optionsToDelete } });
       }
 
-      // Atualizar ou adicionar novas opções
+      // update or add new options
       const optionPromises = options.map(async (option) => {
         if (option.deleted) {
           return ProductOption.destroy({ where: { id: option.id } });
@@ -289,18 +287,17 @@ const updateProduct = async (req, res) => {
   }
 };
 
-// Função para deletar um produto
 const deleteProduct = async (req, res) => {
   try {
     const productId = req.params.id;
 
-    // Verificar se o produto existe
+    // check if product exists
     const product = await Product.findByPk(productId);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Remover o produto
+    // delete product
     await product.destroy();
 
     return res.status(204).send(); // 204 No Content
