@@ -6,8 +6,20 @@ module.exports = (sequelize) => {
       // association with product model
       ProductOption.belongsTo(models.Product, {
         foreignKey: 'product_id',
-        as: 'product',
+        //as: 'product',
       });
+
+      ProductOption.belongsTo(models.Product, {
+        foreignKey: 'product_id',
+        as: 'product', // Alias para a associação
+      });
+      
+
+      // a product has many options
+      // ProductOption.hasMany(models.ProductOption, {
+      //   foreignKey: 'product_id',
+      //   as: 'options',
+      // });
     }
   }
 
@@ -35,7 +47,7 @@ module.exports = (sequelize) => {
         defaultValue: 'square',
       },
       radius: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.STRING,
         defaultValue: 0,
       },
       type: {
