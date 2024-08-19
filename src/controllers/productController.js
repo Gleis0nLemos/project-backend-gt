@@ -80,6 +80,60 @@ const getProducts = async (req, res) => {
   }
 };
 
+const getProductById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findByPk(id, {
+      include: [
+        {
+          model: Category,
+          as: 'categories',
+          attributes: ['id'],  // Ajuste os atributos conforme necessário
+        },
+        {
+          model: ProductOption,
+          as: 'options',
+          attributes: ['id', 'values'],  // Ajuste os atributos conforme necessário
+        },
+        {
+          model: ProductImage,
+          as: 'images',
+          attributes: ['id', 'path'],
+        },
+      ],
+    });
+
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    return res.status(200).json({
+      id: product.id,
+      enabled: product.enabled,
+      name: product.name,
+      slug: product.slug,
+      stock: product.stock,
+      description: product.description,
+      price: product.price,
+      price_with_discount: product.price_with_discount,
+      //category_ids: product.category_ids,
+      images: product.Images.map(image => ({
+        id: image.id,
+        content: image.content,
+      })),
+      options: product.Options.map(options => ({
+        id: options.id,
+        // Include other option fields as needed
+      })),
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   getProducts,
+  getProductById,
 }
