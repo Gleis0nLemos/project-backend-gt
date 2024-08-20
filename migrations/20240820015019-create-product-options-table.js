@@ -28,7 +28,7 @@ module.exports = {
         defaultValue: 'square',
       },
       radius: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING,
         defaultValue: 0,
       },
       type: {
