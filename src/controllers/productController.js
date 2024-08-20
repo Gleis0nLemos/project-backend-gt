@@ -1,4 +1,4 @@
-const { Product, Category, ProductCategory, ProductOption, ProductImage } = require('../models');
+const { Product, Category, ProductOption, ProductImage } = require('../models');
 const { Op } = require('sequelize');
 
 const getProducts = async (req, res) => {
@@ -17,7 +17,7 @@ const getProducts = async (req, res) => {
 
     const whereClause = {};
 
-    // filter name or description
+    // Filter name or description
     if (match) {
       whereClause[Op.or] = [
         { name: { [Op.like]: `%${match}%` } },
@@ -25,21 +25,15 @@ const getProducts = async (req, res) => {
       ];
     }
 
-    // filter by category
+    // Filter by category (using the junction table)
+    let categoryFilter = [];
+
     if (category_ids) {
-      whereClause.category_ids = { [Op.overlap]: category_ids.split(',').map(Number) };
-    }
-
-    // filter by price range
-    if (priceRange) {
-      const [minPrice, maxPrice] = priceRange.split('-').map(Number);
-      whereClause.price = { [Op.between]: [minPrice, maxPrice] };
-    }
-
-    // filter by options
-    for (const [optionId, values] of Object.entries(option)) {
-      whereClause[`options.id`] = optionId;
-      whereClause[`options.value`] = { [Op.in]: values.split(',') };
+      if (Array.isArray(category_ids)) {
+        categoryFilter = category_ids.map(Number); // Ensure all values are numbers
+      } else if (typeof category_ids === 'string') {
+        categoryFilter = category_ids.split(',').map(Number); // Convert comma-separated string to array
+      }
     }
 
     const products = await Product.findAndCountAll({
@@ -52,13 +46,15 @@ const getProducts = async (req, res) => {
           model: Category,
           as: 'categories',
           through: {
-            attributes: ['category_id'],
+            attributes: [],
           },
+          required: categoryFilter.length > 0 ? true : false,
+          where: categoryFilter.length > 0 ? { id: { [Op.in]: categoryFilter } } : undefined,
         },
         {
           model: ProductOption,
           as: 'options',
-          attributes: ['id', 'values'], //'name', 
+          attributes: ['id', 'values'],
         },
         {
           model: ProductImage,
@@ -79,6 +75,8 @@ const getProducts = async (req, res) => {
     return res.status(400).json({ message: 'Bad request' });
   }
 };
+
+
 
 const getProductById = async (req, res) => {
   try {
@@ -108,6 +106,21 @@ const getProductById = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
+    // Verifique se `product.images` e `product.options` são arrays antes de mapear
+    const images = Array.isArray(product.images)
+      ? product.images.map(image => ({
+          id: image.id,
+          content: image.path,  // Ajuste o campo se necessário
+        }))
+      : [];
+
+    const options = Array.isArray(product.options)
+      ? product.options.map(option => ({
+          id: option.id,
+          values: option.values,  // Ajuste os campos conforme necessário
+        }))
+      : [];
+
     return res.status(200).json({
       id: product.id,
       enabled: product.enabled,
@@ -117,21 +130,16 @@ const getProductById = async (req, res) => {
       description: product.description,
       price: product.price,
       price_with_discount: product.price_with_discount,
-      //category_ids: product.category_ids,
-      images: product.Images.map(image => ({
-        id: image.id,
-        content: image.content,
-      })),
-      options: product.Options.map(options => ({
-        id: options.id,
-        // Include other option fields as needed
-      })),
+      category_ids: product.categories.map(category => category.id),
+      images,
+      options,
     });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Internal Server Error' });
   }
 };
+
 
 const createProduct = async (req, res) => {
   try {
