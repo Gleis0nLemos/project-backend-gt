@@ -1,4 +1,4 @@
-const { Product, Category, ProductCategory, ProductOption, ProductImage } = require('../models');
+const { Product, Category, ProductOption, ProductImage } = require('../models');
 const { Op } = require('sequelize');
 
 const getProducts = async (req, res) => {
@@ -17,7 +17,7 @@ const getProducts = async (req, res) => {
 
     const whereClause = {};
 
-    // filter name or description
+    // Filter name or description
     if (match) {
       whereClause[Op.or] = [
         { name: { [Op.like]: `%${match}%` } },
@@ -25,21 +25,15 @@ const getProducts = async (req, res) => {
       ];
     }
 
-    // filter by category
+    // Filter by category (using the junction table)
+    let categoryFilter = [];
+
     if (category_ids) {
-      whereClause.category_ids = { [Op.overlap]: category_ids.split(',').map(Number) };
-    }
-
-    // filter by price range
-    if (priceRange) {
-      const [minPrice, maxPrice] = priceRange.split('-').map(Number);
-      whereClause.price = { [Op.between]: [minPrice, maxPrice] };
-    }
-
-    // filter by options
-    for (const [optionId, values] of Object.entries(option)) {
-      whereClause[`options.id`] = optionId;
-      whereClause[`options.value`] = { [Op.in]: values.split(',') };
+      if (Array.isArray(category_ids)) {
+        categoryFilter = category_ids.map(Number); // Ensure all values are numbers
+      } else if (typeof category_ids === 'string') {
+        categoryFilter = category_ids.split(',').map(Number); // Convert comma-separated string to array
+      }
     }
 
     const products = await Product.findAndCountAll({
@@ -52,13 +46,15 @@ const getProducts = async (req, res) => {
           model: Category,
           as: 'categories',
           through: {
-            attributes: ['category_id'],
+            attributes: [],
           },
+          required: categoryFilter.length > 0 ? true : false,
+          where: categoryFilter.length > 0 ? { id: { [Op.in]: categoryFilter } } : undefined,
         },
         {
           model: ProductOption,
           as: 'options',
-          attributes: ['id', 'values'], //'name', 
+          attributes: ['id', 'values'],
         },
         {
           model: ProductImage,
@@ -79,6 +75,8 @@ const getProducts = async (req, res) => {
     return res.status(400).json({ message: 'Bad request' });
   }
 };
+
+
 
 const getProductById = async (req, res) => {
   try {
@@ -108,6 +106,21 @@ const getProductById = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
+    // Verifique se `product.images` e `product.options` são arrays antes de mapear
+    const images = Array.isArray(product.images)
+      ? product.images.map(image => ({
+          id: image.id,
+          content: image.path,  // Ajuste o campo se necessário
+        }))
+      : [];
+
+    const options = Array.isArray(product.options)
+      ? product.options.map(option => ({
+          id: option.id,
+          values: option.values,  // Ajuste os campos conforme necessário
+        }))
+      : [];
+
     return res.status(200).json({
       id: product.id,
       enabled: product.enabled,
@@ -117,15 +130,9 @@ const getProductById = async (req, res) => {
       description: product.description,
       price: product.price,
       price_with_discount: product.price_with_discount,
-      //category_ids: product.category_ids,
-      images: product.Images.map(image => ({
-        id: image.id,
-        content: image.content,
-      })),
-      options: product.Options.map(options => ({
-        id: options.id,
-        // Include other option fields as needed
-      })),
+      category_ids: product.categories.map(category => category.id),
+      images,
+      options,
     });
   } catch (error) {
     console.error(error);
@@ -133,16 +140,17 @@ const getProductById = async (req, res) => {
   }
 };
 
+
 const createProduct = async (req, res) => {
   try {
-    // Validar o corpo da solicitação
+    // validate the request body
     const { enabled, name, slug, stock, description, price, price_with_discount, category_ids, images, options } = req.body;
 
     if (!name || !slug || !price || !price_with_discount) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    // Criar o produto
+    // create product
     const product = await Product.create({
       enabled,
       name,
@@ -153,16 +161,16 @@ const createProduct = async (req, res) => {
       price_with_discount,
     });
 
-    // Associar categorias
+    // associate categories
     if (category_ids && Array.isArray(category_ids)) {
       await product.setCategories(category_ids);
     }
 
-    // Adicionar imagens
+    // add images
     if (images && Array.isArray(images)) {
       const imagePromises = images.map(image => ProductImage.create({
         type: image.type,
-        path: image.content, // Assume que o conteúdo é base64
+        path: image.content, // assumes content is base64
         product_id: product.id
       }));
       await Promise.all(imagePromises);
@@ -188,20 +196,18 @@ const createProduct = async (req, res) => {
   }
 };
 
-
-// Função para atualizar um produto existente
 const updateProduct = async (req, res) => {
   try {
     const productId = req.params.id;
     const { enabled, name, slug, stock, description, price, price_with_discount, category_ids, images, options } = req.body;
 
-    // Verificar se o produto existe
+    // check if product exists
     const product = await Product.findByPk(productId);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Atualizar o produto
+    // update product
     await product.update({
       enabled,
       name,
@@ -212,23 +218,23 @@ const updateProduct = async (req, res) => {
       price_with_discount,
     });
 
-    // Atualizar categorias
+    // update categories
     if (category_ids && Array.isArray(category_ids)) {
       await product.setCategories(category_ids);
     }
 
-    // Atualizar imagens
+    // update images
     if (images && Array.isArray(images)) {
       const existingImages = await ProductImage.findAll({ where: { product_id: productId } });
       const existingImageIds = existingImages.map(img => img.id);
 
-      // Marcar imagens existentes para exclusão
+      // mark existing images for deletion
       const imagesToDelete = existingImageIds.filter(id => !images.find(img => img.id === id));
       if (imagesToDelete.length > 0) {
         await ProductImage.destroy({ where: { id: imagesToDelete } });
       }
 
-      // Atualizar ou adicionar novas imagens
+      // update or add new images
       const imagePromises = images.map(async (image) => {
         if (image.deleted) {
           return ProductImage.destroy({ where: { id: image.id } });
@@ -248,18 +254,18 @@ const updateProduct = async (req, res) => {
       await Promise.all(imagePromises);
     }
 
-    // Atualizar opções
+    // update options
     if (options && Array.isArray(options)) {
       const existingOptions = await ProductOption.findAll({ where: { product_id: productId } });
       const existingOptionIds = existingOptions.map(opt => opt.id);
 
-      // Marcar opções existentes para exclusão
+      // mark existing options for deletion
       const optionsToDelete = existingOptionIds.filter(id => !options.find(opt => opt.id === id));
       if (optionsToDelete.length > 0) {
         await ProductOption.destroy({ where: { id: optionsToDelete } });
       }
 
-      // Atualizar ou adicionar novas opções
+      // update or add new options
       const optionPromises = options.map(async (option) => {
         if (option.deleted) {
           return ProductOption.destroy({ where: { id: option.id } });
@@ -289,18 +295,17 @@ const updateProduct = async (req, res) => {
   }
 };
 
-// Função para deletar um produto
 const deleteProduct = async (req, res) => {
   try {
     const productId = req.params.id;
 
-    // Verificar se o produto existe
+    // check if product exists
     const product = await Product.findByPk(productId);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Remover o produto
+    // delete product
     await product.destroy();
 
     return res.status(204).send(); // 204 No Content
